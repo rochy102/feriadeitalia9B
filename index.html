@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adhesiones Feria Comida (Cloud)</title>
+    <!-- Tailwind CSS (producción, sin warning de consola) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+        .toast-exit  { animation: fadeOut 0.3s ease-out forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #16a34a; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        /* Colores personalizados usados en ticket y UI */
+        .color-italia  { color: #009246; }
+        .bg-italia     { background-color: #009246; }
+        .border-italia { border-color: #009246; }
+        .bg-wa         { background-color: #25D366; }
+        .bg-wa-dark    { background-color: #128C7E; }
+        .bg-ticket-bg  { background-color: #fdfcf8; }
+        /* Barra de sincronización animada */
+        .sync-bar-inner { height: 100%; width: 33%; position: absolute; background: #16a34a; animation: slide 1s ease-in-out infinite; }
+        /* Tamaños para ticket generado (fuera de pantalla) */
+        .ticket-wrap    { width: 850px; display: flex; border-radius: 1rem; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); border: 1px solid #e5e7eb; font-family: 'Inter', sans-serif; background: #fff; }
+        .ticket-img-col { width: 380px; flex-shrink: 0; }
+        .ticket-info-col{ width: 470px; }
+        /* Animate pulse para el dot de estado */
+        .dot-pulse { animation: pulse 1.5s ease-in-out infinite; }
+        /* Compensar clases de Tailwind 2 que no existen */
+        .font-black   { font-weight: 900; }
+        .tracking-tighter { letter-spacing: -0.05em; }
+        .tracking-widest  { letter-spacing: 0.1em; }
+        .drop-shadow-md   { filter: drop-shadow(0 4px 3px rgba(0,0,0,.07)) drop-shadow(0 2px 2px rgba(0,0,0,.06)); }
+        .leading-none     { line-height: 1; }
+        .leading-tight    { line-height: 1.25; }
+        .backdrop-blur-sm { backdrop-filter: blur(4px); }
+        /* text-xs size overrides */
+        .text-\[10px\] { font-size: 10px; }
+        .text-\[11px\] { font-size: 11px; }
+        /* Color overrides */
+        .text-\[\#009246\] { color: #009246; }
+        .bg-\[\#009246\]   { background-color: #009246; }
+        .bg-\[\#ce2b37\]   { background-color: #ce2b37; }
+        .bg-\[\#fdfcf8\]   { background-color: #fdfcf8; }
+        .bg-\[\#25D366\]   { background-color: #25D366; }
+        .bg-\[\#128C7E\]   { background-color: #128C7E; }
+        .hover\:bg-\[\#128C7E\]:hover { background-color: #128C7E; }
+        .border-\[\#009246\]\/30 { border-color: rgba(0,146,70,0.3); }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <script>
+        // URL del Apps Script — se puede editar desde el panel Admin sin tocar el código
+        let GOOGLE_SHEETS_WEB_APP_URL = localStorage.getItem('feria_webapp_url') || "https://script.google.com/macros/s/AKfycbzkAsYajb9EoULTOgBao5tsRDcHpRH6efVQ8FKYIp2jCJVv9Ag5VvFJ9USk3rNxLuBl/exec";
+    </script>
+
+    <!-- Overlay de Login (Administrador) -->
+    <div id="loginOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 hidden items-center justify-center p-4" style="z-index:9999">
+        <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center border-t-4 border-green-600">
+            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mx-auto mb-4">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Acceso Administrador</h2>
+            <p class="text-sm text-gray-500 mb-6">Ingresa la contraseña para configurar el evento</p>
+            <input type="password" id="adminPassword" placeholder="Contraseña" class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-600 outline-none transition-all">
+            <div class="flex gap-2">
+                <button type="button" onclick="closeLoginModal()" class="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-bold transition-colors">Volver</button>
+                <button type="button" onclick="checkLogin()" class="w-2/3 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow-md transition-colors">Ingresar</button>
+            </div>
+            <p id="loginError" class="text-red-500 text-sm mt-3 hidden font-medium">Contraseña incorrecta</p>
+        </div>
+    </div>
+
+    <!-- Modal de Configuración del Evento (Solo Admin) -->
+    <div id="configOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 hidden items-center justify-center p-4" style="z-index:9999">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full border-t-4 border-blue-600 custom-scrollbar relative overflow-y-auto" style="max-height:90vh">
+            
+            <div id="cfgOverlayLoading" class="absolute inset-0 bg-white bg-opacity-80 z-10 hidden flex-col items-center justify-center">
+                <div class="loader mb-2"></div>
+                <p class="font-bold text-gray-600">Guardando en la nube...</p>
+            </div>
+
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Configuración del Evento
+                </h2>
+                <button type="button" onclick="closeConfigModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- SECCIÓN URL APPS SCRIPT -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        URL del Apps Script (Web App)
+                    </label>
+                    <span id="cfgUrlStatusBadge" class="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-500">
+                        <span id="cfgUrlStatusDot" class="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                        <span id="cfgUrlStatusText">Sin verificar</span>
+                    </span>
+                </div>
+                <div class="flex gap-2 mt-1">
+                    <input type="text" id="cfgWebAppUrl"
+                        placeholder="https://script.google.com/macros/s/..."
+                        class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-0">
+                    <button type="button" onclick="testConnectionFromModal()"
+                        id="cfgTestBtn"
+                        class="flex-shrink-0 px-3 py-2 bg-slate-700 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5">
+                        <svg id="cfgTestIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Probar
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-1.5 leading-tight">Pegá aquí la URL de tu implementación de Google Apps Script. Se guarda en este dispositivo.</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Plato / Producto que se vende</label>
+                    <input type="text" id="cfgPlato" placeholder="Ej. Hamburguesa, Asado..." class="w-full px-4 py-2 border rounded-lg focus:ring-blue-600">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Grado / Curso</label>
+                    <input type="text" id="cfgGrado" placeholder="Ej. 3er Año, Promoción 2024..." class="w-full px-4 py-2 border rounded-lg focus:ring-blue-600">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                        <input type="date" id="cfgFecha" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-600">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                        <input type="time" id="cfgHora" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-600">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lugar del Evento</label>
+                    <input type="text" id="cfgLugar" placeholder="Ej. Colegio, Club..." class="w-full px-4 py-2 border rounded-lg focus:ring-blue-600">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones (Opcional)</label>
+                    <textarea id="cfgObs" rows="2" placeholder="Ej. Llevar cubiertos, incluir bebida..." class="w-full px-4 py-2 border rounded-lg focus:ring-blue-600"></textarea>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+                    <label class="block text-sm font-bold text-gray-900 mb-1">URL de la Imagen (Flyer del Ticket)</label>
+                    <input type="text" id="cfgFlyer" placeholder="https://ejemplo.com/mi-foto.jpg" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-600 mb-1 text-sm">
+                    <p class="text-[11px] text-gray-600 leading-tight">Sube tu foto a <b>postimages.org</b> y pega aquí el "Enlace Directo".</p>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex gap-3">
+                <button type="button" onclick="closeConfigModal()" class="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-bold transition-colors">Cancelar</button>
+                <button type="button" onclick="saveEventConfig()" class="w-2/3 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-md transition-colors">Guardar en Sheets</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor principal -->
+    <div id="appContainer" class="flex flex-col min-h-screen w-full">
+        <!-- HEADER -->
+        <header class="bg-white shadow-sm border-b-4 border-green-600 relative">
+            <!-- Global sync bar -->
+            <div id="globalSync" class="absolute top-0 left-0 w-full h-1 bg-green-200 hidden overflow-hidden">
+                <div class="sync-bar-inner"></div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+                    </div>
+                    <div class="flex items-center">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-900">Adhesiones <span id="headerGrado" class="text-green-600"></span></h1>
+                            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <p id="headerPlato" class="text-sm text-gray-500 font-medium">Feria de Comida</p>
+                                <span id="headerConnectionBadge" class="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                    <span id="headerConnectionDot" class="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                                    <span id="headerConnectionText">Verificando...</span>
+                                </span>
+                            </div>
+                        </div>
+                        <button type="button" id="adminLoginBtn" onclick="showLoginModal()" class="ml-3 text-gray-300 hover:text-gray-500 transition-colors" title="Configurar Evento (Admin)">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="text-sm font-medium text-gray-500 flex items-center gap-2">
+                    <button onclick="initApp()" class="flex items-center gap-1 hover:text-green-600 transition-colors bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-bold" title="Refrescar datos de la nube">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Sincronizar
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- TABS DE NAVEGACIÓN -->
+        <nav class="bg-white border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6">
+                <button type="button" onclick="switchTab('ventas')" id="tabBtn-ventas" class="py-3 border-b-2 border-green-600 font-bold text-green-700 transition-colors">Ventas y Lista</button>
+                <button type="button" onclick="switchTab('dashboard')" id="tabBtn-dashboard" class="py-3 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-800 transition-colors">Dashboard (Finanzas)</button>
+            </div>
+        </nav>
+
+        <!-- CONTENEDOR 1: VENTAS Y LISTA -->
+        <main id="ventasContainer" class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex flex-col md:flex-row gap-8">
+            
+            <!-- Panel Izquierdo: Formulario -->
+            <div class="w-full md:w-1/3 flex-shrink-0">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-8">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Registrar Venta
+                    </h2>
+                    
+                    <form id="adhesionForm" class="space-y-4">
+                        <div>
+                            <label for="vendedor" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Vendedor</label>
+                            <input type="text" id="vendedor" required placeholder="Ej. Juan Pérez" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 outline-none transition-colors">
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 mt-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="precio" class="block text-sm font-medium text-gray-700 mb-1">Precio Unit. (Gs.)</label>
+                                    <input type="number" id="precio" min="0" step="1000" required placeholder="Ej. 15000" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 outline-none transition-colors">
+                                </div>
+                                <div>
+                                    <label for="cantidad" class="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                                    <input type="number" id="cantidad" min="1" value="1" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 outline-none transition-colors">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="comprador" class="block text-sm font-medium text-gray-700 mb-1 mt-2">Quien Retira (Opcional p/ preventa)</label>
+                                <input type="text" id="comprador" placeholder="Vacío si es preventa" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 outline-none transition-colors">
+                            </div>
+                            <div class="mt-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Estado inicial de pago</label>
+                                <div class="flex gap-4">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="estadoPago" value="pagado" class="text-green-600 focus:ring-green-600">
+                                        <span class="text-sm font-medium text-gray-800">Pagado</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="estadoPago" value="pendiente" checked class="text-yellow-600 focus:ring-yellow-600">
+                                        <span class="text-sm font-medium text-gray-800">Pendiente</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="submitBtn" class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                            <span>Guardar en Sheets</span>
+                            <div id="submitSpinner" class="loader !w-5 !h-5 !border-2 !border-white !border-t-green-600 hidden"></div>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Panel Derecho: Lista -->
+            <div class="w-full md:w-2/3 transition-all duration-300">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                        <h2 class="text-lg font-bold text-gray-900">Base de Datos (Google Sheets)</h2>
+                        <span id="totalBadge" class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-green-200">Total: 0</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendedor</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retira</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-gray-200 bg-white relative">
+                                <!-- Filas de datos -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- CONTENEDOR 2: DASHBOARD FINANCIERO -->
+        <main id="dashboardContainer" class="hidden flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-col gap-6">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-2xl font-bold text-gray-900">Resumen Financiero Global</h2>
+                <div class="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg font-semibold text-sm border border-blue-200 shadow-sm">
+                    Total Adhesiones: <span id="dash-count" class="text-lg font-black ml-1">0</span>
+                </div>
+            </div>
+
+            <!-- Tarjetas Principales -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Tarjeta Cobrado -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-2 h-full bg-green-500"></div>
+                    <p class="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Total Cobrado (En Caja)
+                    </p>
+                    <p id="dash-pagado" class="text-4xl font-black text-gray-900 mt-2">Gs. 0</p>
+                </div>
+                
+                <!-- Tarjeta Pendiente -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-2 h-full bg-yellow-400"></div>
+                    <p class="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Total Pendiente (A Cobrar)
+                    </p>
+                    <p id="dash-pendiente" class="text-4xl font-black text-gray-900 mt-2">Gs. 0</p>
+                </div>
+            </div>
+
+            <!-- Barra de Progreso de Cobranza -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-2">
+                <p class="text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">Progreso de Cobranza</p>
+                <div class="w-full bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                    <div id="dash-progress" class="bg-green-500 h-6 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    <div id="dash-progress-text" class="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800 drop-shadow-sm">0%</div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 mt-2 font-medium">
+                    <span>Recaudado Total Proyectado: <span id="dash-proyectado" class="text-gray-800 font-bold">Gs. 0</span></span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL LOTE GENERADO (Para enviar WhatsApp) -->
+    <div id="batchModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center p-4" style="z-index:8000">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 flex flex-col" style="max-height:90vh">
+            <h3 class="text-2xl font-black text-gray-900 mb-1 text-center">¡Guardado en Sheets!</h3>
+            <p id="batchMessage" class="text-gray-500 mb-4 text-center text-sm font-medium"></p>
+            <div id="batchList" class="flex-grow overflow-y-auto mb-4 space-y-2 pr-2 custom-scrollbar"></div>
+            
+            <div class="mt-auto pt-4 border-t flex flex-col gap-3">
+                <div class="bg-green-50 p-3 rounded-lg border border-green-100">
+                    <label class="block text-xs font-bold text-green-800 mb-2 text-center">Compartir todos juntos por WhatsApp</label>
+                    <button type="button" id="btnShareBatchWhatsApp" onclick="shareBatchWhatsApp()" class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-3 rounded-lg text-sm font-bold shadow flex items-center justify-center gap-2 transition-colors">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                        <span id="btnShareBatchText">Enviar todos a WhatsApp</span>
+                        <div id="btnShareBatchSpinner" class="loader !w-4 !h-4 !border-2 !border-white !border-t-transparent hidden"></div>
+                    </button>
+                </div>
+                <button type="button" onclick="closeBatchModal()" class="w-full px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold transition-colors">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de WhatsApp / Imagen (Individual Preview) -->
+    <div id="waModal" class="fixed inset-0 bg-black bg-opacity-75 hidden flex items-center justify-center p-4 backdrop-blur-sm" style="z-index:8500">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 flex flex-col overflow-y-auto custom-scrollbar" style="max-height:90vh">
+            <h3 class="text-xl font-bold text-gray-900 mb-2 text-center">Ticket Individual</h3>
+            <p id="waMessage" class="text-gray-600 mb-4 text-center text-sm"></p>
+            <div class="flex-grow overflow-y-auto mb-4 bg-gray-100 rounded-lg p-2 border flex justify-center items-center min-h-[250px]">
+                <img id="receiptPreviewImage" src="" alt="Cargando imagen..." class="max-w-full h-auto shadow-sm">
+            </div>
+            <div class="flex flex-col gap-3 mt-auto">
+                <button type="button" id="btnShareImage" class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex justify-center items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg> Compartir / Descargar
+                </button>
+                <button type="button" onclick="closeWaModal()" class="w-full px-4 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold transition-colors">Volver</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edición -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4" style="z-index:8000">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 m-4 relative">
+            <div id="editOverlayLoading" class="absolute inset-0 bg-white bg-opacity-80 z-10 hidden flex-col items-center justify-center rounded-xl">
+                <div class="loader mb-2"></div>
+                <p class="font-bold text-gray-600">Actualizando Sheets...</p>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Editar Adhesión <span id="editNumero" class="text-green-600"></span></h3>
+            <div class="space-y-4 mt-4">
+                <input type="hidden" id="editId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
+                    <input type="text" id="editVendedor" class="w-full px-4 py-2 border rounded-lg focus:ring-green-600">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Precio Unit. (Gs.)</label>
+                        <input type="number" id="editPrecio" min="0" class="w-full px-4 py-2 border rounded-lg focus:ring-green-600">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quien Retira</label>
+                        <input type="text" id="editComprador" placeholder="Vacío = Preventa" class="w-full px-4 py-2 border rounded-lg focus:ring-green-600">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6 pt-4 border-t">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Cancelar</button>
+                    <button type="button" onclick="saveEdit()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor para Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 flex flex-col gap-2" style="z-index:9999"></div>
+
+    <script>
+        // ESTADO EN MEMORIA (Totalmente volátil, se nutre de Google Sheets)
+        let eventConfig = { plato: '', grado: '', fecha: '', hora: '', lugar: '', obs: '', flyerUrl: '' };
+        let adhesiones = [];
+        window.lastGeneratedTickets = [];
+        window.batchFilesArray = []; // Almacenará los PNG generados en segundo plano
+
+        // Referencias DOM
+        const form = document.getElementById('adhesionForm');
+        const tableBody = document.getElementById('tableBody');
+        const globalSync = document.getElementById('globalSync');
+
+        // Utils
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer'), toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 toast-enter max-w-sm`;
+            toast.innerHTML = `<p class="text-sm font-medium">${message}</p>`; container.appendChild(toast);
+            setTimeout(() => { toast.classList.add('toast-exit'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+        function escapeHtml(unsafe) { return !unsafe ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+        function setSyncing(isSyncing) { if(isSyncing) globalSync.classList.remove('hidden'); else globalSync.classList.add('hidden'); }
+        function formatDateCustom(dStr) { if(!dStr) return ''; let s = String(dStr).split('T')[0]; const p = s.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : s; }
+        function formatTimeCustom(tStr) { 
+            if(!tStr) return ''; 
+            let s = String(tStr).trim();
+            // Si es formato ISO con timezone (2024-01-15T15:30:00.000Z), extraer solo HH:MM
+            if(s.includes('T')) {
+                const timePart = s.split('T')[1];
+                return timePart.substring(0, 5); // Primeros 5 chars = HH:MM
+            }
+            // Si es formato HH:MM:SS, truncar a HH:MM
+            if(s.includes(':') && s.split(':').length >= 2) {
+                const parts = s.split(':');
+                return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
+            }
+            return s; 
+        }
+        function normalizeTimeInput(tStr) {
+            // Normalizar hora de input antes de guardar (asegurar formato HH:MM sin conversión)
+            if(!tStr) return '';
+            const clean = String(tStr).trim();
+            if(clean.match(/^\d{1,2}:\d{2}/)) return clean.substring(0, 5);
+            return clean;
+        }
+
+        // ---- CONEXIÓN CON GOOGLE SHEETS (Híbrido JSONP + fetch fallback) ----
+        function fetchGoogleSheets(payload) {
+            return new Promise((resolve, reject) => {
+                if (!GOOGLE_SHEETS_WEB_APP_URL) {
+                    reject(new Error("Falta configurar la URL de Apps Script en el panel Admin."));
+                    return;
+                }
+                
+                // Intentar JSONP primero (funciona desde cualquier origen)
+                const callbackName = 'gsheet_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                let jsonpFailed = false;
+                
+                const timeout = setTimeout(() => {
+                    jsonpFailed = true;
+                    delete window[callbackName];
+                    // Si JSONP falla, intentar fetch normal
+                    tryFetchFallback();
+                }, 8000);
+                
+                window[callbackName] = function(data) {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    if (data.success) resolve(data);
+                    else reject(new Error(data.error || "Error en servidor"));
+                };
+                
+                const sep = GOOGLE_SHEETS_WEB_APP_URL.includes('?') ? '&' : '?';
+                const jsonpUrl = GOOGLE_SHEETS_WEB_APP_URL + sep + 
+                    'payload=' + encodeURIComponent(JSON.stringify(payload)) +
+                    '&callback=' + callbackName;
+                
+                const script = document.createElement('script');
+                script.src = jsonpUrl;
+                script.onerror = function() {
+                    if (!jsonpFailed) {
+                        clearTimeout(timeout);
+                        delete window[callbackName];
+                        tryFetchFallback();
+                    }
+                };
+                document.head.appendChild(script);
+                setTimeout(() => { try { document.head.removeChild(script); } catch(e) {} }, 1000);
+                
+                // Fallback a fetch GET simple (sin callback)
+                function tryFetchFallback() {
+                    const fetchUrl = GOOGLE_SHEETS_WEB_APP_URL + sep + 'payload=' + encodeURIComponent(JSON.stringify(payload));
+                    fetch(fetchUrl, { method: 'GET', redirect: 'follow' })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) resolve(data);
+                            else reject(new Error(data.error || "Error en servidor"));
+                        })
+                        .catch(err => reject(new Error("Sin conexión con el servidor")));
+                }
+            });
+        }
+
+        // ---- INICIALIZACIÓN Y CARGA DESDE SHEETS ----
+        async function initApp() {
+            if (!GOOGLE_SHEETS_WEB_APP_URL) {
+                setConnectionStatus('unconfigured');
+                tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center">
+                    <div class="bg-red-50 text-red-700 p-4 rounded-lg inline-block text-sm font-bold border border-red-200 shadow-sm max-w-lg">
+                        ⚠️ Sin URL configurada. Ingresá al panel Admin (⚙️) y pegá la URL de tu Apps Script.
+                    </div>
+                </td></tr>`;
+                return;
+            }
+
+            setConnectionStatus('checking');
+
+            tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 font-medium flex flex-col items-center justify-center gap-3">
+                <div class="loader !border-gray-200 !border-t-green-600"></div> Descargando datos desde Google Sheets...
+            </td></tr>`;
+            setSyncing(true);
+            
+            try {
+                const data = await fetchGoogleSheets({ action: 'get_all' });
+                
+                // Cargar configuración desde la nube
+                if (data.config && Object.keys(data.config).length > 0) {
+                    eventConfig = { ...eventConfig, ...data.config };
+                    // Normalizar hora para evitar conversión de timezone
+                    if (eventConfig.hora) {
+                        eventConfig.hora = formatTimeCustom(eventConfig.hora);
+                    }
+                }
+                
+                // Cargar tickets desde la nube
+                if (data.tickets) {
+                    adhesiones = data.tickets.map(t => ({
+                        ...t, numero: parseInt(t.numero), precio: parseInt(t.precio)
+                    }));
+                }
+                
+                updateUIHeaders();
+                renderTable();
+                updateDashboardStats();
+                setConnectionStatus('connected');
+                
+            } catch (error) {
+                setConnectionStatus('disconnected');
+                tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-red-500 font-bold">Error de conexión: ${error.message}</td></tr>`;
+                showToast("Fallo al conectar con Google Sheets", "error");
+            } finally {
+                setSyncing(false);
+            }
+        }
+
+        function updateUIHeaders() {
+            document.getElementById('headerPlato').textContent = eventConfig.plato ? `Vendiendo: ${eventConfig.plato}` : 'Feria de Comida'; 
+            document.getElementById('headerGrado').textContent = eventConfig.grado ? `- ${eventConfig.grado}` : ''; 
+        }
+
+        // ---- TABS LOGIC ----
+        window.switchTab = function(tabName) {
+            const vC = document.getElementById('ventasContainer'), dC = document.getElementById('dashboardContainer');
+            const vB = document.getElementById('tabBtn-ventas'), dB = document.getElementById('tabBtn-dashboard');
+            
+            if(tabName === 'ventas') {
+                vC.classList.remove('hidden'); vC.classList.add('flex');
+                dC.classList.add('hidden'); dC.classList.remove('flex');
+                vB.classList.add('border-green-600', 'text-green-700'); vB.classList.remove('border-transparent', 'text-gray-500');
+                dB.classList.add('border-transparent', 'text-gray-500'); dB.classList.remove('border-green-600', 'text-green-700');
+            } else {
+                vC.classList.add('hidden'); vC.classList.remove('flex');
+                dC.classList.remove('hidden'); dC.classList.add('flex');
+                dB.classList.add('border-green-600', 'text-green-700'); dB.classList.remove('border-transparent', 'text-gray-500');
+                vB.classList.add('border-transparent', 'text-gray-500'); vB.classList.remove('border-green-600', 'text-green-700');
+                updateDashboardStats(); 
+            }
+        };
+
+        function updateDashboardStats() {
+            let pagado = 0, pendiente = 0;
+            adhesiones.forEach(a => {
+                const precio = a.precio || 0;
+                if(a.estadoPago === 'pagado') pagado += precio; else pendiente += precio;
+            });
+            const total = pagado + pendiente;
+            const progress = total > 0 ? Math.round((pagado / total) * 100) : 0;
+
+            document.getElementById('dash-count').textContent = adhesiones.length;
+            document.getElementById('dash-pagado').textContent = `Gs. ${pagado.toLocaleString('es-PY')}`;
+            document.getElementById('dash-pendiente').textContent = `Gs. ${pendiente.toLocaleString('es-PY')}`;
+            document.getElementById('dash-proyectado').textContent = `Gs. ${total.toLocaleString('es-PY')}`;
+            
+            const pBar = document.getElementById('dash-progress');
+            pBar.style.width = `${progress}%`;
+            pBar.className = `h-6 rounded-full transition-all duration-500 ${progress === 100 ? 'bg-blue-500' : progress > 50 ? 'bg-green-500' : 'bg-yellow-400'}`;
+            document.getElementById('dash-progress-text').textContent = `${progress}%`;
+            document.getElementById('dash-progress-text').style.color = progress > 50 ? 'white' : '#374151';
+        }
+
+        // ---- ADMIN & CONFIG (Guarda en la Nube) ----
+        window.showLoginModal = function() { document.getElementById('loginOverlay').classList.remove('hidden'); document.getElementById('loginOverlay').classList.add('flex'); document.getElementById('adminPassword').value = ''; document.getElementById('loginError').classList.add('hidden'); document.getElementById('adminPassword').focus(); };
+        window.closeLoginModal = function() { document.getElementById('loginOverlay').classList.add('hidden'); document.getElementById('loginOverlay').classList.remove('flex'); };
+        window.checkLogin = function() { if (document.getElementById('adminPassword').value === 'Iramain102$ro$') { closeLoginModal(); openConfigModal(); } else { document.getElementById('loginError').classList.remove('hidden'); } };
+        
+        window.openConfigModal = function() { 
+            document.getElementById('cfgPlato').value = eventConfig.plato || ''; 
+            document.getElementById('cfgGrado').value = eventConfig.grado || ''; 
+            document.getElementById('cfgFecha').value = eventConfig.fecha ? String(eventConfig.fecha).split('T')[0] : ''; 
+            document.getElementById('cfgHora').value = formatTimeCustom(eventConfig.hora); 
+            document.getElementById('cfgLugar').value = eventConfig.lugar || ''; 
+            document.getElementById('cfgObs').value = eventConfig.obs || ''; 
+            document.getElementById('cfgFlyer').value = eventConfig.flyerUrl || '';
+            // Cargar URL actual en el campo
+            document.getElementById('cfgWebAppUrl').value = GOOGLE_SHEETS_WEB_APP_URL || '';
+            // Reflejar el estado de conexión actual en el modal
+            syncModalBadgeFromHeader();
+            document.getElementById('configOverlay').classList.remove('hidden'); 
+            document.getElementById('configOverlay').classList.add('flex'); 
+        };
+
+        // ---- ESTADO DE CONEXIÓN ----
+        function setConnectionStatus(status) {
+            // status: 'checking' | 'connected' | 'disconnected' | 'unconfigured'
+            const configs = {
+                checking:     { dot: 'bg-yellow-400 dot-pulse', badge: 'bg-yellow-50 text-yellow-700 border-yellow-200', text: 'Verificando...' },
+                connected:    { dot: 'bg-green-500',                 badge: 'bg-green-50 text-green-700 border-green-200',   text: 'Conectado ✓'   },
+                disconnected: { dot: 'bg-red-500',                   badge: 'bg-red-50 text-red-700 border-red-200',         text: 'Sin conexión'  },
+                unconfigured: { dot: 'bg-gray-400',                  badge: 'bg-gray-100 text-gray-500 border-gray-200',     text: 'Sin configurar'},
+            };
+            const cfg = configs[status] || configs.unconfigured;
+
+            // Header badge
+            const hDot  = document.getElementById('headerConnectionDot');
+            const hText = document.getElementById('headerConnectionText');
+            const hBadge = document.getElementById('headerConnectionBadge');
+            hDot.className  = `w-2 h-2 rounded-full inline-block ${cfg.dot}`;
+            hText.textContent = cfg.text;
+            hBadge.className = `inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${cfg.badge}`;
+
+            // Modal badge (si está abierto)
+            syncModalBadgeFromHeader();
+        }
+
+        function syncModalBadgeFromHeader() {
+            const hDot  = document.getElementById('headerConnectionDot');
+            const hText = document.getElementById('headerConnectionText');
+            if (!hDot) return;
+            const mDot  = document.getElementById('cfgUrlStatusDot');
+            const mText = document.getElementById('cfgUrlStatusText');
+            const mBadge = document.getElementById('cfgUrlStatusBadge');
+            if (!mDot) return;
+            mDot.className  = hDot.className;
+            mText.textContent = hText.textContent;
+            // Mantener colores consistentes
+            const src = document.getElementById('headerConnectionBadge').className;
+            const match = src.match(/bg-\S+ text-\S+ border-\S+/);
+            if (match) mBadge.className = `inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${match[0]}`;
+        }
+
+        window.testConnectionFromModal = function() {
+            const urlInput = document.getElementById('cfgWebAppUrl');
+            const url = urlInput.value.trim();
+            const btn = document.getElementById('cfgTestBtn');
+            const icon = document.getElementById('cfgTestIcon');
+
+            if (!url) { showToast("Pegá primero la URL del Apps Script", "error"); return; }
+
+            btn.disabled = true;
+            icon.outerHTML = `<div id="cfgTestIcon" class="loader !w-3.5 !h-3.5 !border-2 !border-white !border-t-transparent"></div>`;
+            setConnectionStatus('checking');
+
+            const callbackName = 'test_' + Date.now();
+            const timeout = setTimeout(() => {
+                delete window[callbackName];
+                finalize(false, "Timeout - el servidor no respondió a tiempo");
+            }, 10000);
+
+            window[callbackName] = function(data) {
+                clearTimeout(timeout);
+                delete window[callbackName];
+                if (data.success !== undefined) {
+                    GOOGLE_SHEETS_WEB_APP_URL = url;
+                    localStorage.setItem('feria_webapp_url', url);
+                    setConnectionStatus('connected');
+                    showToast("✅ Conexión exitosa — URL guardada");
+                    syncModalBadgeFromHeader();
+                    finalize(true);
+                } else {
+                    finalize(false, "Respuesta inesperada del servidor");
+                }
+            };
+
+            const sep = url.includes('?') ? '&' : '?';
+            const testUrl = url + sep + 'payload=' + encodeURIComponent(JSON.stringify({ action: 'get_all' })) + '&callback=' + callbackName;
+            const script = document.createElement('script');
+            script.src = testUrl;
+            script.onerror = function() {
+                clearTimeout(timeout);
+                delete window[callbackName];
+                finalize(false, "No se pudo conectar - verifica la URL");
+            };
+            document.head.appendChild(script);
+
+            function finalize(success, msg) {
+                btn.disabled = false;
+                if (!success) {
+                    setConnectionStatus('disconnected');
+                    showToast("❌ " + msg, "error");
+                }
+                document.getElementById('cfgTestIcon') && (document.getElementById('cfgTestIcon').outerHTML = `<svg id="cfgTestIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`);
+            }
+        };
+        window.closeConfigModal = function() { document.getElementById('configOverlay').classList.add('hidden'); document.getElementById('configOverlay').classList.remove('flex'); };
+        
+        window.saveEventConfig = async function() {
+            // Verificar URL antes de intentar guardar
+            if (!GOOGLE_SHEETS_WEB_APP_URL) {
+                showToast("Primero pegá la URL del Apps Script y presioná Probar", "error");
+                return;
+            }
+
+            const newConfig = {
+                plato:    document.getElementById('cfgPlato').value.trim(),
+                grado:    document.getElementById('cfgGrado').value.trim(),
+                fecha:    document.getElementById('cfgFecha').value,
+                hora:     normalizeTimeInput(document.getElementById('cfgHora').value),
+                lugar:    document.getElementById('cfgLugar').value.trim(),
+                obs:      document.getElementById('cfgObs').value.trim(),
+                flyerUrl: document.getElementById('cfgFlyer').value.trim()
+            };
+
+            const loader = document.getElementById('cfgOverlayLoading');
+            loader.classList.remove('hidden'); loader.classList.add('flex');
+
+            try {
+                await fetchGoogleSheets({ action: 'save_config', config: newConfig });
+                eventConfig = { ...newConfig };
+                updateUIHeaders();
+                showToast("✅ Configuración guardada en Google Sheets");
+                closeConfigModal();
+            } catch (error) {
+                const msg = error.message || '';
+                let hint = '';
+                if (msg.includes('Sin conexión')) {
+                    hint = '⚠️ PASO OBLIGATORIO: Copiá el archivo Code_FeriaComida.gs completo en tu Apps Script → Implementar → Nueva versión → Ejecutar como "Yo", Acceso "Cualquier persona". Después pegá la URL nueva aquí.';
+                } else {
+                    hint = msg;
+                }
+                showToast(hint, "error");
+            } finally {
+                loader.classList.add('hidden'); loader.classList.remove('flex');
+            }
+        };
+
+        // ---- ACCIONES PRINCIPALES Y DATOS (CRUD CLOUD) ----
+        function getNextNumero() { return adhesiones.length === 0 ? 1 : adhesiones.reduce((m, c) => (c.numero > m) ? c.numero : m, 0) + 1; }
+
+        async function handleAddAdhesion(e) {
+            e.preventDefault(); 
+            if (!GOOGLE_SHEETS_WEB_APP_URL) return showToast("Falta configurar la URL de Apps Script en el HTML", "error");
+
+            const vendedor = document.getElementById('vendedor').value.trim();
+            const comprador = document.getElementById('comprador').value.trim();
+            const cantidad = parseInt(document.getElementById('cantidad').value) || 1;
+            const precio = parseInt(document.getElementById('precio').value) || 0;
+            const estadoPago = document.querySelector('input[name="estadoPago"]:checked').value;
+            
+            if (!vendedor) return showToast("Vendedor obligatorio", "error");
+            
+            const sB = document.getElementById('submitBtn'), sS = document.getElementById('submitSpinner');
+            sB.disabled = true; sS.classList.remove('hidden'); setSyncing(true);
+
+            try {
+                let currentNum = getNextNumero(); 
+                const newTickets = [];
+                
+                for(let i = 0; i < cantidad; i++) {
+                    // Generar un ID único seguro
+                    const docId = 'tkt-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+                    newTickets.push({ 
+                        id: docId, 
+                        numero: currentNum, 
+                        vendedor, 
+                        comprador, 
+                        precio, 
+                        estadoPago, 
+                        comida: eventConfig.plato || 'Adhesión General' 
+                    });
+                    currentNum++;
+                }
+
+                // POST a Sheets
+                await fetchGoogleSheets({ action: 'create_tickets', tickets: newTickets });
+
+                // Actualizar estado en memoria si tuvo éxito
+                adhesiones.push(...newTickets);
+                window.lastGeneratedTickets = newTickets;
+                
+                // Preparar Modal de Batch
+                const batchList = document.getElementById('batchList');
+                batchList.innerHTML = ''; 
+                newTickets.forEach(t => {
+                    batchList.innerHTML += `
+                        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <div><p class="font-black text-gray-900 text-lg leading-none">Ticket #${t.numero}</p><p class="text-xs text-gray-500 font-medium mt-1">Gs. ${t.precio.toLocaleString('es-PY')}</p></div>
+                            <button type="button" onclick="shareSingleTicket('${t.id}')" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">Enviar PNG</button>
+                        </div>`;
+                });
+
+                renderTable(); updateDashboardStats();
+                
+                document.getElementById('batchMessage').innerHTML = `Se guardaron <b>${cantidad}</b> tickets en Google Sheets para ${escapeHtml(vendedor)}.`;
+                document.getElementById('batchModal').classList.remove('hidden'); showToast(`¡Tickets Registrados en la nube!`);
+                
+                // PREPARAR IMÁGENES EN SEGUNDO PLANO PARA EVITAR TIMEOUT DE WHATSAPP
+                prepareBatchWhatsAppShare(newTickets);
+
+                // Limpiar
+                document.getElementById('vendedor').value = ''; 
+                document.getElementById('comprador').value = ''; 
+                document.getElementById('cantidad').value = '1'; 
+                document.querySelector('input[name="estadoPago"][value="pendiente"]').checked = true; 
+                document.getElementById('vendedor').focus();
+            } catch (error) { 
+                showToast("Error al guardar: " + error.message, "error"); 
+            } finally { 
+                sB.disabled = false; sS.classList.add('hidden'); setSyncing(false);
+            }
+        }
+
+        // ---- ACTUALIZAR (Toggle Estado y Edit) ----
+        window.toggleEstadoPago = async function(docId, estadoActual) {
+            if (!GOOGLE_SHEETS_WEB_APP_URL) return;
+            const idx = adhesiones.findIndex(a => a.id === docId);
+            if (idx === -1) return;
+            
+            const nuevoEstado = estadoActual === 'pagado' ? 'pendiente' : 'pagado';
+            const ticketCopy = { ...adhesiones[idx], estadoPago: nuevoEstado };
+
+            setSyncing(true);
+            try {
+                await fetchGoogleSheets({ action: 'update_ticket', ticket: ticketCopy });
+                adhesiones[idx].estadoPago = nuevoEstado;
+                renderTable(); updateDashboardStats();
+                showToast("Estado actualizado en Sheets");
+            } catch (error) {
+                showToast("Error actualizando: " + error.message, "error");
+            } finally {
+                setSyncing(false);
+            }
+        };
+
+        window.openEditModal = function(id) { 
+            const ticket = adhesiones.find(t => t.id === id);
+            if(!ticket) return;
+            document.getElementById('editId').value = ticket.id; 
+            document.getElementById('editNumero').textContent = `#${ticket.numero}`; 
+            document.getElementById('editVendedor').value = ticket.vendedor; 
+            document.getElementById('editComprador').value = (ticket.comprador==='undefined'||ticket.comprador==='null')?'':ticket.comprador; 
+            document.getElementById('editPrecio').value = ticket.precio || 0; 
+            document.getElementById('editModal').classList.remove('hidden'); 
+        };
+        window.closeEditModal = function() { document.getElementById('editModal').classList.add('hidden'); };
+        
+        window.saveEdit = async function() {
+            const id = document.getElementById('editId').value;
+            const v = document.getElementById('editVendedor').value.trim();
+            const c = document.getElementById('editComprador').value.trim();
+            const p = parseInt(document.getElementById('editPrecio').value) || 0;
+            
+            if (!v) return showToast("Vendedor obligatorio", "error");
+            const idx = adhesiones.findIndex(a => a.id === id);
+            if (idx === -1) return;
+
+            const ticketCopy = { ...adhesiones[idx], vendedor: v, comprador: c, precio: p };
+            
+            const loader = document.getElementById('editOverlayLoading');
+            loader.classList.remove('hidden'); loader.classList.add('flex'); setSyncing(true);
+
+            try {
+                await fetchGoogleSheets({ action: 'update_ticket', ticket: ticketCopy });
+                adhesiones[idx] = ticketCopy;
+                renderTable(); updateDashboardStats(); 
+                closeEditModal(); 
+                showToast(`Ticket #${ticketCopy.numero} actualizado en Sheets`);
+            } catch (error) {
+                showToast("Error actualizando: " + error.message, "error");
+            } finally {
+                loader.classList.add('hidden'); loader.classList.remove('flex'); setSyncing(false);
+            }
+        };
+
+        // ---- BORRAR (Delete) ----
+        window.handleDeleteClick = async function(bE, docId, num) {
+            if (bE.dataset.confirm === "true") { 
+                setSyncing(true); bE.innerHTML = `<div class="loader !w-4 !h-4 !border-[2px] !border-red-600 !border-t-transparent"></div>`;
+                try {
+                    await fetchGoogleSheets({ action: 'delete_ticket', id: docId });
+                    adhesiones = adhesiones.filter(a => a.id !== docId);
+                    renderTable(); updateDashboardStats(); 
+                    showToast(`Borrado #${num} de Google Sheets`);
+                } catch(e) {
+                    showToast("Error borrando: " + e.message, "error"); renderTable();
+                } finally { setSyncing(false); }
+            } 
+            else { 
+                bE.dataset.confirm = "true"; const org = bE.innerHTML; 
+                bE.innerHTML = `<span class="text-xs font-bold px-1 text-red-700">¿Seguro?</span>`; bE.classList.add('bg-red-200'); 
+                setTimeout(() => { if(document.body.contains(bE)){ bE.dataset.confirm = "false"; bE.innerHTML = org; bE.classList.remove('bg-red-200'); } }, 3000); 
+            }
+        };
+
+        function renderTable() {
+            if (adhesiones.length === 0) { 
+                tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 text-sm font-medium">No hay adhesiones en la base de datos.<br>Las ventas que registres aparecerán aquí automáticamente.</td></tr>`; 
+                document.getElementById('totalBadge').textContent = 'Total: 0'; 
+                return; 
+            }
+            
+            document.getElementById('totalBadge').textContent = `Total: ${adhesiones.length}`;
+            let htmlContent = '';
+            
+            adhesiones.sort((a, b) => a.numero - b.numero).forEach(a => {
+                const isP = a.estadoPago === 'pagado';
+                const cT = a.comprador ? escapeHtml(a.comprador) : `<span class="text-gray-400 italic">Preventa</span>`;
+                
+                htmlContent += `
+                    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-black text-gray-900">#${a.numero}</div></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-semibold text-gray-800">${escapeHtml(a.vendedor)}</div></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600">${cT}</div></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-bold text-gray-900">${a.precio ? 'Gs. ' + a.precio.toLocaleString('es-PY') : '0'}</div></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${isP ? 'bg-green-100 text-green-800 border-green-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}">${isP ? 'Pagado' : 'Pendiente'}</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex justify-end gap-1.5">
+                            <button type="button" onclick="toggleEstadoPago('${a.id}', '${a.estadoPago}')" title="Cambiar Estado" class="text-gray-600 hover:bg-gray-100 bg-white p-1.5 rounded border border-gray-300 shadow-sm transition-colors">${isP ? `<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>` : `<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`}</button>
+                            <button type="button" onclick="shareSingleTicket('${a.id}')" title="Ticket PNG" class="text-orange-600 hover:bg-orange-50 bg-white p-1.5 rounded border border-orange-200 shadow-sm transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg></button>
+                            <button type="button" onclick="openEditModal('${a.id}')" title="Editar" class="text-blue-600 hover:bg-blue-50 bg-white p-1.5 rounded border border-blue-200 shadow-sm transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                            <button type="button" onclick="handleDeleteClick(this, '${a.id}', ${a.numero})" title="Borrar de la Nube" class="text-red-600 hover:bg-red-50 bg-white p-1.5 rounded border border-red-200 shadow-sm transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tableBody.innerHTML = htmlContent;
+        }
+
+        // ---- TICKET INDIVIDUAL Y ENVIOS ----
+        window.closeWaModal = function() { document.getElementById('waModal').classList.add('hidden'); };
+        window.closeBatchModal = function() { document.getElementById('batchModal').classList.add('hidden'); };
+
+        // Nueva función: Generar tickets de WhatsApp inmediatamente en segundo plano
+        window.prepareBatchWhatsAppShare = async function(tickets) {
+            window.batchFilesArray = [];
+            const btn = document.getElementById('btnShareBatchWhatsApp');
+            const btnText = document.getElementById('btnShareBatchText');
+            const btnSpinner = document.getElementById('btnShareBatchSpinner');
+            
+            btn.disabled = true; 
+            btnText.textContent = "Preparando imágenes...";
+            btnSpinner.classList.remove('hidden');
+
+            try {
+                for (const ticket of tickets) {
+                    const dataUrl = await generateSingleTicketImage(ticket);
+                    if (dataUrl) {
+                        const res = await fetch(dataUrl);
+                        const blob = await res.blob();
+                        const file = new File([blob], `Ticket_${ticket.numero}_${ticket.vendedor.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
+                        window.batchFilesArray.push(file);
+                    }
+                }
+                btnText.textContent = "Enviar todos a WhatsApp";
+            } catch (error) {
+                btnText.textContent = "Error al preparar";
+                console.error(error);
+            } finally {
+                btn.disabled = false; 
+                btnSpinner.classList.add('hidden');
+            }
+        };
+
+        window.shareBatchWhatsApp = async function() {
+            if (!window.batchFilesArray || window.batchFilesArray.length === 0) {
+                return showToast("Las imágenes aún se están preparando, espera un segundo...", "warning");
+            }
+
+            let sharedSuccess = false;
+
+            // Intentar compartir nativamente (Celulares y OS compatibles)
+            if (navigator.canShare && navigator.canShare({ files: window.batchFilesArray })) {
+                try {
+                    const fLugar = eventConfig.lugar || 'A definir';
+                    const fHora = formatTimeCustom(eventConfig.hora) || 'A definir';
+                    
+                    await navigator.share({
+                        title: `Tickets de ${window.lastGeneratedTickets[0].vendedor}`,
+                        text: `📍 Lugar: ${fLugar}\n⏰ Hora: ${fHora}`,
+                        files: window.batchFilesArray
+                    });
+                    sharedSuccess = true;
+                    showToast("¡Tickets enviados!");
+                } catch (shareError) {
+                    console.warn("Fallo el share nativo:", shareError);
+                    // Si falló por incompatibilidad (no porque el usuario lo canceló manual), usamos el plan B
+                    if (shareError.name !== 'AbortError') {
+                        sharedSuccess = false; 
+                    } else {
+                        sharedSuccess = true; // El usuario canceló a propósito
+                    }
+                }
+            }
+
+            // Fallback (Plan B): Descarga múltiple (Si es PC o el envío nativo falló)
+            if (!sharedSuccess) {
+                showToast("Descargando imágenes (Tu dispositivo no soporta envío múltiple directo)...", "warning");
+                for (let i = 0; i < window.batchFilesArray.length; i++) {
+                    const file = window.batchFilesArray[i];
+                    const url = URL.createObjectURL(file);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = file.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    // Mayor tiempo entre descargas para evitar que el navegador las bloquee por spam
+                    await new Promise(r => setTimeout(r, 600)); 
+                }
+                showToast("¡Descargas completadas!");
+            }
+        };
+
+        async function generateSingleTicketImage(ticket) {
+            const tempDiv = document.createElement('div'); tempDiv.style.position = 'fixed'; tempDiv.style.left = '200vw'; tempDiv.style.top = '0';
+            const isPagado = ticket.estadoPago === 'pagado', fFecha = formatDateCustom(eventConfig.fecha), fHora = formatTimeCustom(eventConfig.hora);
+            let htmlObs = eventConfig.obs ? `<div style="margin-top:12px; padding-top:12px; border-top:1px solid #f3f4f6;"><p style="font-size:10px; color:#6b7280; font-style:italic; line-height:1.25; margin:0;">📌 ${escapeHtml(eventConfig.obs)}</p></div>` : '';
+            const flyerSrc = eventConfig.flyerUrl || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
+
+            tempDiv.innerHTML = `
+<div id="cap-tkt-${ticket.numero}" style="width:850px; height:550px; position:relative; border-radius:16px; box-shadow:0 20px 25px rgba(0,0,0,0.1); overflow:hidden; font-family:'Inter',sans-serif; background:#fff; border:1px solid #e5e7eb;">
+    <div style="position:absolute; left:0; top:0; width:380px; height:100%; background:#fdfcf8; padding:16px; border-right:1px solid #e5e7eb; display:flex; align-items:center; justify-content:center;">
+        <img src="${flyerSrc}" crossorigin="anonymous" style="max-width:100%; max-height:100%; object-fit:contain; filter:drop-shadow(0 4px 3px rgba(0,0,0,.07)); border-radius:8px;" />
+    </div>
+    <div style="position:absolute; left:380px; top:0; width:470px; height:100%; padding:32px; background:#fff; overflow:hidden;">
+        <div style="position:absolute; left:380px; top:24px; bottom:24px; width:0; border-left:4px dashed #e5e7eb;"></div>
+        <div style="padding-left:24px; position:relative; z-index:10; height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:2px solid #f3f4f6; padding-bottom:20px;">
+                    <div>
+                        <span style="font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:4px;">Nº de Adhesión</span>
+                        <div style="font-size:60px; font-weight:900; color:#111827; line-height:1; letter-spacing:-0.05em;">#${ticket.numero}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Estado</span>
+                        <div style="font-size:18px; padding:4px 12px; border-radius:8px; font-weight:900; border:2px solid; ${isPagado ? 'background:#f0fdf4; color:#009246; border-color:rgba(0,146,70,0.3);' : 'background:#fef9c3; color:#ca8a04; border-color:#fde047;'}">${isPagado ? 'PAGADO' : 'PENDIENTE'}</div>
+                    </div>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <p style="font-size:11px; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.1em; margin:0 0 4px 0;">Valor Total</p>
+                    <p style="font-size:36px; font-weight:900; color:#111827; margin:0;">Gs. ${(ticket.precio || 0).toLocaleString('es-PY')}</p>
+                </div>
+                <div style="background:#f9fafb; padding:16px; border-radius:12px; border:1px solid #f3f4f6; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <div style="flex:1;"><p style="font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.05em; margin:0 0 4px 0;">Cuándo</p><p style="font-weight:700; color:#1f2937; font-size:14px; line-height:1.25; margin:0;">${fFecha || 'Por definir'}<br>${fHora}</p></div>
+                        <div style="flex:1;"><p style="font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.05em; margin:0 0 4px 0;">Dónde</p><p style="font-weight:700; color:#1f2937; font-size:14px; line-height:1.25; margin:0;">${escapeHtml(eventConfig.lugar || 'Por definir')}</p></div>
+                    </div>
+                    ${htmlObs}
+                </div>
+                <div style="display:flex; gap:12px; margin-bottom:20px;">
+                    <div style="flex:1; background:#fff; padding:12px; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <p style="font-size:10px; color:#009246; text-transform:uppercase; font-weight:700; letter-spacing:0.05em; margin:0 0 4px 0;">Vendedor</p>
+                        <p style="font-weight:700; color:#1f2937; font-size:14px; word-break:break-word; line-height:1.25; margin:0;">${escapeHtml(ticket.vendedor)}</p>
+                    </div>
+                    <div style="flex:1; background:#fff; padding:12px; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <p style="font-size:10px; color:#009246; text-transform:uppercase; font-weight:700; letter-spacing:0.05em; margin:0 0 4px 0;">Retira</p>
+                        <p style="font-weight:700; color:#1f2937; font-size:14px; word-break:break-word; line-height:1.25; margin:0;">${escapeHtml(ticket.comprador) || '<span style="color:#d1d5db;">Preventa</span>'}</p>
+                    </div>
+                </div>
+            </div>
+            <div style="padding-top:16px; border-top:1px solid #f3f4f6; display:flex; justify-content:space-between; align-items:center;">
+                <p style="font-size:10px; font-weight:700; color:#9ca3af; letter-spacing:0.1em; text-transform:uppercase; margin:0;">${eventConfig.grado ? escapeHtml(eventConfig.grado) : 'Sistema Adhesiones Cloud'}</p>
+                <div style="width:64px; height:8px; display:flex; border-radius:4px; overflow:hidden; opacity:0.8;"><div style="width:21px; background:#009246;"></div><div style="width:21px; background:#e5e7eb;"></div><div style="width:21px; background:#ce2b37;"></div></div>
+            </div>
+        </div>
+    </div>
+</div>`;
+            document.body.appendChild(tempDiv);
+            await document.fonts.ready; await new Promise(r => setTimeout(r, 250));
+            const el = document.getElementById(`cap-tkt-${ticket.numero}`);
+            try { const cv = await html2canvas(el, { scale: 2.0, backgroundColor: '#ffffff', logging: false, useCORS: true }); document.body.removeChild(tempDiv); return cv.toDataURL('image/png', 1.0); } 
+            catch (error) { document.body.removeChild(tempDiv); return null; }
+        }
+        
+        window.shareSingleTicket = async function(id) {
+            let ticket = adhesiones.find(a => a.id === id);
+            if (!ticket) { showToast("Error ubicando ticket.", "error"); return; }
+            document.getElementById('waModal').classList.remove('hidden'); const pImg = document.getElementById('receiptPreviewImage'), bS = document.getElementById('btnShareImage');
+            pImg.src = ""; document.getElementById('waMessage').innerHTML = `Generando imagen para <b>${escapeHtml(ticket.vendedor)}</b>...`; bS.disabled = true; bS.classList.add('opacity-50');
+            const dataUrl = await generateSingleTicketImage(ticket);
+            if (dataUrl) {
+                document.getElementById('waMessage').innerHTML = `Ticket individual listo`;
+                pImg.src = dataUrl; bS.disabled = false; bS.classList.remove('opacity-50');
+                bS.onclick = async () => {
+                    try { const blob = await (await fetch(dataUrl)).blob(); const file = new File([blob], `Ticket_${ticket.numero}_${ticket.vendedor.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
+                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                            const fLugar = eventConfig.lugar || 'A definir';
+                            const fHora = formatTimeCustom(eventConfig.hora) || 'A definir';
+                            await navigator.share({ 
+                                title: `Ticket #${ticket.numero}`, 
+                                text: `📍 Lugar: ${fLugar}\n⏰ Hora: ${fHora}`,
+                                files: [file] 
+                            });
+                        }
+                        else { const l = document.createElement('a'); l.download = file.name; l.href = dataUrl; l.click(); showToast("¡Descargado!"); }
+                    } catch (e) { const l = document.createElement('a'); l.download = `Ticket_${ticket.numero}.png`; l.href = dataUrl; l.click(); }
+                };
+            } else { showToast("Fallo al generar imagen.", "error"); }
+        };
+
+        // Iniciar Event Listeners
+        form.addEventListener('submit', handleAddAdhesion);
+        initApp(); // Arrancar conexión a nube
+    </script>
+</body>
+</html>
